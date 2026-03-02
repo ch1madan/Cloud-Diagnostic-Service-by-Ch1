@@ -1,7 +1,6 @@
 #!./venv/bin/python
-
 import logging
-from config import settings
+from app.config import settings
 
 def setup_logger():
     logging.basicConfig(

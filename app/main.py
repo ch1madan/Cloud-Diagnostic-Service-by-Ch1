@@ -1,31 +1,34 @@
-#!./venv/bin/python
-
-import os
 import socket
 import platform
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from app.config import settings
+from app.logger import setup_logger, logger
+
+setup_logger()
 
 app = FastAPI(
-    title="Cloud Diagnostic Service by Ch1",
-    version="0.0.1"
+    title=settings.APP_NAME,
+    version=settings.VERSION
 )
 
-APP_VERSION = "0.0.1"
-GIT_COMMIT = os.getenv("GIT_COMMIT", "unknown") #for CI/CD GitHub Actions или GitLab CI
-ENVIRONMENT = os.getenv("ENVIRONMENT", "dev")   #В настройках GitHub Actions, GitLab CI или внутри Docker-контейнера принудительно устанавливается ENVIRONMENT=production. Программа видит это значение, отключает опасные отладочные функции и подключается к боевым серверам.
 
-"""
-Классический Health Check эндпоинт (обычно на фреймворке FastAPI или Flask).
-Его задача: сказать системе мониторинга, что приложение «живо», и показать, 
-какая именно версия кода сейчас запущена.
-"""
-@app.get("/health")                         # декоратор, который создает маршрут (путь) /health
-def health():                               # определяем функцию health
-    return {                                # в FASTapi возвращаемый словарь Python автоматически превращается в JSON.
-        "status":"OK! Diagnostic APP is running!",
-        "version":APP_VERSION,
-        "git_commit":GIT_COMMIT
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    logger.info(f"Incoming request: {request.method} {request.url}")
+    response = await call_next(request)
+    logger.info(f"Response status: {response.status_code}")
+    return response
+
+
+@app.get("/health")
+def health():
+    return {
+        "status": "ok",
+        "version": settings.VERSION,
+        "git_commit": settings.GIT_COMMIT,
+        "environment": settings.ENVIRONMENT
     }
+
 
 @app.get("/info")
 def info():
@@ -36,5 +39,5 @@ def info():
         "hostname": hostname,
         "ip_address": ip_address,
         "platform": platform.system(),
-        "Environment": ENVIRONMENT
+        "environment": settings.ENVIRONMENT
     }
